@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="description" content="RiNOO : (A)synchronous socket management">
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>RiNOO</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/reginaldl/librinoo">View on GitHub</a>
+
+          <h1 id="project_title">RiNOO</h1>
+          <h2 id="project_tagline">(A)synchronous socket management</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/reginaldl/librinoo/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/reginaldl/librinoo/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h1>
+<a name="rinoo" class="anchor" href="#rinoo"><span class="octicon octicon-link"></span></a>RiNOO</h1>
+
+<p><a href="https://drone.io/github.com/reginaldl/librinoo/latest"><img src="https://drone.io/github.com/reginaldl/librinoo/status.png" alt="Build Status"></a>
+<a href="https://scan.coverity.com/projects/2835"><img src="https://scan.coverity.com/projects/2835/badge.svg" alt="Coverity"></a></p>
+
+<p>RiNOO is a socket management library. RiNOO sockets are asynchronous but "appear" synchronous.
+This is possible by using fast-contexts (see fcontext project). Code looks simple. The complexity
+of asynchronous sockets is hidden.
+RiNOO is a simple way to create high scalability client/server applications.</p>
+
+<h2>
+<a name="documentation" class="anchor" href="#documentation"><span class="octicon octicon-link"></span></a>Documentation</h2>
+
+<ul>
+<li><a href="https://github.com/reginaldl/librinoo/wiki/Using-librinoo-for-fun-and-profit">Using librinoo for fun and profit</a></li>
+<li><a href="https://github.com/reginaldl/librinoo/wiki/Libevent-vs.-RiNOO">Libevent vs. RiNOO</a></li>
+</ul><h2>
+<a name="examples" class="anchor" href="#examples"><span class="octicon octicon-link"></span></a>Examples</h2>
+
+<h3>
+<a name="hello-world" class="anchor" href="#hello-world"><span class="octicon octicon-link"></span></a>Hello world!</h3>
+
+<pre><code>#include "rinoo/rinoo.h"
+
+void task_client(void *socket)
+{
+    char a;
+
+    rinoo_socket_write(socket, "Hello world!\n", 13);
+    rinoo_socket_read(socket, &amp;a, 1);
+    rinoo_socket_destroy(socket);
+}
+
+void task_server(void *sched)
+{
+    t_socket *server;
+    t_socket *client;
+
+    server = rinoo_tcp_server(sched, IP_ANY, 4242);
+    while ((client = rinoo_tcp_accept(server, NULL, NULL)) != NULL) {
+        rinoo_task_start(sched, task_client, client);
+    }
+    rinoo_socket_destroy(server);
+}
+
+int main()
+{
+    t_sched *sched;
+
+    sched = rinoo_sched();
+    rinoo_task_start(sched, task_server, sched);
+    rinoo_sched_loop(sched);
+    rinoo_sched_destroy(sched);
+    return 0;
+}
+</code></pre>
+
+<h3>
+<a name="multi-threading" class="anchor" href="#multi-threading"><span class="octicon octicon-link"></span></a>Multi-threading</h3>
+
+<pre><code>#include "rinoo/rinoo.h"
+
+void task_client(void *socket)
+{
+    char a;
+
+    rinoo_socket_write(socket, "Hello world!\n", 13);
+    rinoo_socket_read(socket, &amp;a, 1);
+    rinoo_socket_destroy(socket);
+}
+
+void task_server(void *server)
+{
+    t_sched *sched;
+    t_socket *client;
+
+    sched = rinoo_sched_self();
+    while ((client = rinoo_tcp_accept(server, NULL, NULL)) != NULL) {
+            rinoo_log("Accepted connection on thread %d", sched-&gt;id);
+            rinoo_task_start(sched, task_client, client);
+    }
+    rinoo_socket_destroy(server);
+}
+
+int main()
+{
+    int i;
+    t_sched *spawn;
+    t_sched *sched;
+    t_socket *server;
+
+    sched = rinoo_sched();
+    server = rinoo_tcp_server(sched, IP_ANY, 4242);
+    /* Spawning 10 schedulers, each running in a separate thread */
+    rinoo_spawn(sched, 10);
+    for (i = 1; i &lt;= 10; i++) {
+            spawn = rinoo_spawn_get(sched, i);
+            rinoo_task_start(spawn, task_server, rinoo_socket_dup(spawn, server));
+    }
+    rinoo_task_start(sched, task_server, server);
+    rinoo_sched_loop(sched);
+    rinoo_sched_destroy(sched);
+    return 0;
+}
+</code></pre>
+
+<h3>
+<a name="http" class="anchor" href="#http"><span class="octicon octicon-link"></span></a>HTTP</h3>
+
+<pre><code>#include "rinoo/rinoo.h"
+
+void http_client(void *sched)
+{
+    t_http http;
+    t_socket *client;
+
+    client = rinoo_tcp_client(sched, IP_LOOPBACK, 80, 0);
+    rinoo_http_init(client, &amp;http);
+    rinoo_http_request_send(&amp;http, RINOO_HTTP_METHOD_GET, "/", NULL);
+    rinoo_http_response_get(&amp;http);
+    rinoo_log("client - %.*s", buffer_size(http.response.buffer), buffer_ptr(http.response.buffer));
+    rinoo_http_destroy(&amp;http);
+    rinoo_socket_destroy(client);
+}
+
+int main()
+{
+    t_sched *sched;
+
+    sched = rinoo_sched();
+    rinoo_task_start(sched, http_client, sched);
+    rinoo_sched_loop(sched);
+    rinoo_sched_destroy(sched);
+    return 0;
+}
+</code></pre>
+
+<h3>
+<a name="http-easy-server" class="anchor" href="#http-easy-server"><span class="octicon octicon-link"></span></a>HTTP easy server</h3>
+
+<pre><code>#include "rinoo/rinoo.h"
+
+t_http_route routes[] = {
+    { "/", 200, RINOO_HTTP_ROUTE_STATIC, .content = "&lt;html&gt;&lt;body&gt;&lt;center&gt;Welcome to RiNOO HTTP server!&lt;br/&gt;&lt;br/&gt;&lt;a href=\"/motd\"&gt;motd&lt;/a&gt;&lt;/center&gt;&lt;body&gt;&lt;/html&gt;" },
+    { "/motd", 200, RINOO_HTTP_ROUTE_FILE, .file = "/etc/motd" },
+    { NULL, 302, RINOO_HTTP_ROUTE_REDIRECT, .location = "/" }
+};
+
+int main()
+{
+    t_sched *sched;
+
+    sched = rinoo_sched();
+    rinoo_http_easy_server(sched, 0, 4242, routes, sizeof(routes) / sizeof(*routes));
+    rinoo_sched_loop(sched);
+    rinoo_sched_destroy(sched);
+    return 0;
+}
+</code></pre>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">RiNOO maintained by <a href="https://github.com/reginaldl">reginaldl</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
