@@ -29,5 +29,6 @@
 #include "rinoo/scheduler/epoll.h"
 #include "rinoo/scheduler/spawn.h"
 #include "rinoo/scheduler/scheduler.h"
+#include "rinoo/scheduler/channel.h"
 
 #endif /* !RINOO_MODULE_SCHEDULER_H_ */
