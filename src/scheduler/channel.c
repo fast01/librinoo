@@ -39,6 +39,40 @@ void rinoo_channel_destroy(t_channel *channel)
 	free(channel);
 }
 
+void *rinoo_channel_get(t_channel *channel)
+{
+	void *result;
+	t_task *task;
+	t_sched *sched;
+
+	sched = rinoo_sched_self();
+	if (channel->sched != sched) {
+		return NULL;
+	}
+	if (channel->buf == NULL) {
+		channel->task = rinoo_task_self();
+		rinoo_task_release(sched);
+		if (channel->buf == NULL) {
+			return NULL;
+		}
+	}
+	result = channel->buf;
+	task = channel->task;
+	channel->buf = NULL;
+	channel->size = 0;
+	channel->task = NULL;
+	rinoo_task_schedule(task, NULL);
+	return result;
+}
+
+int rinoo_channel_put(t_channel *channel, void *ptr)
+{
+	if (rinoo_channel_write(channel, ptr, 0) < 0) {
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * Read from a channel. This is blocking.
  *
@@ -46,9 +80,9 @@ void rinoo_channel_destroy(t_channel *channel)
  * @param dest Pointer to memory where to store result.
  * @param size Size of memory read.
  *
- * @return 0 on success, or -1 if an error occurs.
+ * @return number of bytes read on success, or -1 if an error occurs.
  */
-int rinoo_channel_read(t_channel *channel, void **dest, size_t *size)
+int rinoo_channel_read(t_channel *channel, void *dest, size_t size)
 {
 	t_task *task;
 	t_sched *sched;
@@ -64,14 +98,21 @@ int rinoo_channel_read(t_channel *channel, void **dest, size_t *size)
 			return -1;
 		}
 	}
-	*dest = channel->buf;
-	*size = channel->size;
-	task = channel->task;
-	channel->buf = NULL;
-	channel->size = 0;
-	channel->task = NULL;
-	rinoo_task_schedule(task, NULL);
-	return 0;
+	if (size > channel->size) {
+		size = channel->size;
+	}
+	memcpy(dest, channel->buf, size);
+	channel->size -= size;
+	if (channel->size > 0) {
+		channel->buf += size;
+	} else {
+		task = channel->task;
+		channel->buf = NULL;
+		channel->size = 0;
+		channel->task = NULL;
+		rinoo_task_schedule(task, NULL);
+	}
+	return size;
 }
 
 /**
@@ -81,7 +122,7 @@ int rinoo_channel_read(t_channel *channel, void **dest, size_t *size)
  * @param buf Buffer to write.
  * @param size Size of buf.
  *
- * @return 0 on success, or -1 if an error occurs.
+ * @return Number of bytes written on success, or -1 if an error occurs.
  */
 int rinoo_channel_write(t_channel *channel, void *buf, size_t size)
 {
@@ -100,5 +141,5 @@ int rinoo_channel_write(t_channel *channel, void *buf, size_t size)
 	}
 	channel->task = rinoo_task_self();
 	rinoo_task_release(sched);
-	return 0;
+	return size;
 }

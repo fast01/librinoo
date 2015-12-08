@@ -1,9 +1,9 @@
 /**
  * @file   rinoo_channel_get.c
  * @author Reginald Lips <reginald.l@gmail.com> - Copyright 2015
- * @date   Mon Dec  7 21:24:24 2015
+ * @date   Mon Dec  7 21:22:13 2015
  *
- * @brief  rinoo_channel_read/rinoo_channel_write unit test
+ * @brief  rinoo_channel_get/rinoo_channel_put unit test
  *
  *
  */
@@ -13,26 +13,24 @@
 void task1(void *channel)
 {
 	int i;
-	int x;
-	size_t len;
+	int *x;
 
 	for (i = 0; i < 10; i++) {
-		rinoo_channel_write(channel, &i, sizeof(i));
-		rinoo_channel_read(channel, &x, sizeof(x));
-		XTEST(i == x);
+		rinoo_channel_put(channel, &i);
+		x = rinoo_channel_get(channel);
+		XTEST(i == *x);
 	}
 }
 
 void task2(void *channel)
 {
 	int i;
-	int x;
-	size_t len;
+	int *x;
 
 	for (i = 0; i < 10; i++) {
-		rinoo_channel_read(channel, &x, sizeof(x));
-		XTEST(i == x);
-		rinoo_channel_write(channel, &i, sizeof(i));
+		x = rinoo_channel_get(channel);
+		XTEST(i == *x);
+		rinoo_channel_put(channel, &i);
 	}
 }
 
