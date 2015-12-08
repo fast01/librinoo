@@ -1,8 +1,6 @@
 #include "rinoo/rinoo.h"
 
-t_channel *channel;
-
-void task1(void *sched)
+void task1(void *channel)
 {
 	int i;
 	int *x;
@@ -15,7 +13,7 @@ void task1(void *sched)
 	}
 }
 
-void task2(void *sched)
+void task2(void *channel)
 {
 	int i;
 	int *x;
@@ -23,8 +21,8 @@ void task2(void *sched)
 
 	for (i = 0; i < 10; i++) {
 		rinoo_channel_read(channel, (void **) &x, &len);
-		rinoo_channel_write(channel, &i, sizeof(i));
 		XTEST(i == *x);
+		rinoo_channel_write(channel, &i, sizeof(i));
 	}
 }
 
@@ -37,13 +35,15 @@ void task2(void *sched)
 int main()
 {
 	t_sched *sched;
+	t_channel *channel;
+
 
 	sched = rinoo_sched();
 	XTEST(sched != NULL);
 	channel = rinoo_channel(sched);
 	XTEST(channel != NULL);
-	XTEST(rinoo_task_start(sched, task1, sched) == 0);
-	XTEST(rinoo_task_start(sched, task2, sched) == 0);
+	XTEST(rinoo_task_start(sched, task1, channel) == 0);
+	XTEST(rinoo_task_start(sched, task2, channel) == 0);
 	rinoo_sched_loop(sched);
 	rinoo_channel_destroy(channel);
 	rinoo_sched_destroy(sched);
