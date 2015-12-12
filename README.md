@@ -1,5 +1,5 @@
 # RiNOO
-[![Build Status](https://drone.io/github.com/reginaldl/librinoo/status.png)](https://drone.io/github.com/reginaldl/librinoo/latest)
+[![Build Status](https://drone.io/github.com/reginaldl/librinoo/status-test.png)](https://drone.io/github.com/reginaldl/librinoo/latest)
 [![Coverity](https://scan.coverity.com/projects/2835/badge.svg)](https://scan.coverity.com/projects/2835)
 
 RiNOO is a socket management library. RiNOO sockets are asynchronous but "appear" synchronous.
